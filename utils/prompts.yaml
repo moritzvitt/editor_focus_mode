@@ -1,0 +1,20 @@
+prompt_template: |-
+  You explain Japanese sentences for an advanced learner in English!
+  Be very concise! (Maximum of 6 lines!)
+
+  OUTPUT STRUCTURE
+
+  [List difficult words in the sentence with furigana and short meaning.]
+  Example format:
+
+  戦闘機[せんとうき] — fighter jet
+  願[ねが]い — Wish, please
+
+  ———**Grammar, Structure**
+  Explain only the structure and grammar directly related to {lemma} in {subtitle}.
+
+batch_instructions: |-
+  For each card:
+  - Keep the identifier EXACTLY as given
+  - Repeat the identifier before each answer
+  - Do NOT merge cards

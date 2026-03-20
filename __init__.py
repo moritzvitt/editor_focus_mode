@@ -12,8 +12,6 @@ from aqt.qt import (
     QKeySequence,
     QLineEdit,
     QMenu,
-    QObject,
-    QShortcut,
     QTimer,
     Qt,
 )
@@ -158,49 +156,11 @@ def _refresh_chatgpt_shortcut() -> None:
         _CHATGPT_SHORTCUT_ACTION = action
     else:
         _CHATGPT_SHORTCUT_ACTION.setShortcuts([QKeySequence(s) for s in sequences])
-    browser = _current_browser()
-    if browser is not None:
-        _apply_browser_shortcuts(browser, sequences)
-
-
-def _apply_browser_shortcuts(browser, sequences: list[str]) -> None:
-    if isinstance(browser, (list, tuple)):
-        browser = next((b for b in browser if b is not None), None)
-    if isinstance(browser, type):
-        # Some Anki builds may keep the class in the dialogs registry.
-        return
-    if browser is not None and not isinstance(browser, QObject):
-        return
-    if browser is None:
-        return
-    existing = getattr(browser, "_chatgpt_shortcuts", None)
-    if existing:
-        for shortcut in existing:
-            try:
-                shortcut.setParent(None)
-            except Exception:
-                pass
-    shortcuts = []
-    for seq in sequences:
-        shortcut = QShortcut(QKeySequence(seq), browser)
-        shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        qconnect(shortcut.activated, _run_chatgpt_helper)
-        shortcuts.append(shortcut)
-    browser._chatgpt_shortcuts = shortcuts
 
 
 def _register_browser_instance(browser) -> None:
     global _LAST_BROWSER
     _LAST_BROWSER = browser
-
-    config = _get_addon_config()
-    sequence = str(config.get(CHATGPT_CONFIG_SHORTCUT) or CHATGPT_DEFAULT_SHORTCUT)
-    sequences = [sequence]
-    if sys.platform == "darwin":
-        normalized = sequence.replace("Command", "Meta").replace("Cmd", "Meta")
-        if "Ctrl" in normalized and "Meta" not in normalized:
-            sequences.append(normalized.replace("Ctrl", "Meta"))
-    _apply_browser_shortcuts(browser, sequences)
 
     def _clear() -> None:
         global _LAST_BROWSER
