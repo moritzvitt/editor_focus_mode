@@ -55,8 +55,12 @@ def _parse_simple_yaml(text: str) -> dict[str, str]:
                 if next_line.startswith("  ") or next_line.startswith("\t"):
                     block.append(next_line.lstrip("\t").lstrip(" "))
                     idx += 1
-                else:
-                    break
+                    continue
+                if next_line.strip() == "":
+                    block.append("")
+                    idx += 1
+                    continue
+                break
             result[key] = "\n".join(block).rstrip()
             continue
         if rest:

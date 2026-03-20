@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 
 from aqt import dialogs, gui_hooks, mw, qconnect
 from aqt.qt import (
@@ -228,6 +229,44 @@ def copy_to_clipboard(text: str) -> None:
     mw.app.clipboard().setText(text)
 
 
+def _focus_chatgpt_app() -> None:
+    if sys.platform != "darwin":
+        return
+    try:
+        subprocess.run(
+            ["/usr/bin/osascript", "-e", 'tell application "ChatGPT" to activate'],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def _paste_into_chatgpt_app() -> None:
+    if sys.platform != "darwin":
+        return
+    script = (
+        'tell application "ChatGPT" to activate\n'
+        'tell application "System Events" to keystroke "v" using {command down}\n'
+        'tell application "System Events" to key code 36'
+    )
+    try:
+        subprocess.run(
+            ["/usr/bin/osascript", "-e", script],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def _focus_and_paste_chatgpt() -> None:
+    _focus_chatgpt_app()
+    _paste_into_chatgpt_app()
+
+
 def wait_for_clipboard_change(old_text: str) -> None:
     global _CHATGPT_WAIT_TIMER
     if _CHATGPT_WAIT_TIMER is not None:
@@ -425,6 +464,8 @@ def _run_chatgpt_helper() -> None:
         )
 
     copy_to_clipboard(prompt)
+    if sys.platform == "darwin":
+        QTimer.singleShot(300, _focus_and_paste_chatgpt)
     _CHATGPT_PENDING = {
         "mode": mode,
         "note_ids": note_ids,
