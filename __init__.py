@@ -483,6 +483,13 @@ def _chatgpt_required_fields(config: dict[str, str]) -> dict[str, str]:
 
 def _run_chatgpt_helper() -> None:
     global _CHATGPT_PENDING, _CHATGPT_WAIT_TIMER
+    if _CHATGPT_PENDING is not None and _CHATGPT_PENDING.get("captured"):
+        _apply_captured_response()
+        return
+    browser = _current_browser()
+    if browser is not None and getattr(browser, "editor", None) is not None:
+        _run_chatgpt_helper_from_editor(browser.editor)
+        return
     config = _get_addon_config()
     mode = str(config.get(CHATGPT_CONFIG_MODE) or CHATGPT_MODE_OFF)
     if mode == CHATGPT_MODE_OFF:
