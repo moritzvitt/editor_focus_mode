@@ -288,6 +288,15 @@ def toggle_field_visibility(editor) -> None:
             editor.web.eval(js)
         except Exception:
             pass
+        QTimer.singleShot(150, lambda: editor.web.eval(js))
+        QTimer.singleShot(350, lambda: editor.web.eval(js))
+        try:
+            if hasattr(editor, "call_after_note_saved"):
+                editor.call_after_note_saved(lambda: editor.loadNote(), keepFocus=True)
+            else:
+                editor.loadNote()
+        except Exception:
+            pass
     QTimer.singleShot(150, lambda: _update_toggle_button_label(editor))
     QTimer.singleShot(300, lambda: _update_toggle_button_label(editor))
 
