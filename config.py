@@ -14,6 +14,8 @@ CHATGPT_CONFIG_LEMMA_FIELD = "chatgpt_field_lemma"
 CHATGPT_CONFIG_SUBTITLE_FIELD = "chatgpt_field_subtitle"
 CHATGPT_CONFIG_QUESTION_FIELD = "chatgpt_field_question"
 CHATGPT_CONFIG_GRAMMAR_FIELD = "chatgpt_field_grammar"
+FIELD_VISIBILITY_MAP = "field_visibility_map"
+FIELD_VISIBILITY_DISABLED = "field_visibility_disabled"
 
 CHATGPT_DEFAULT_SHORTCUT = (
     "Meta+Shift+G" if sys.platform == "darwin" else "Ctrl+Shift+G"
@@ -47,6 +49,16 @@ def get_addon_config() -> dict[str, str]:
         config.get(CHATGPT_CONFIG_GRAMMAR_FIELD) or ""
     ).strip():
         config[CHATGPT_CONFIG_GRAMMAR_FIELD] = "Grammar"
+    if FIELD_VISIBILITY_MAP not in config or not isinstance(
+        config.get(FIELD_VISIBILITY_MAP), dict
+    ):
+        config[FIELD_VISIBILITY_MAP] = {
+            "Moritz Language Reactor": ["Lemma", "Cloze", "Synonyms", "Japanese Notes"]
+        }
+    if FIELD_VISIBILITY_DISABLED not in config or not isinstance(
+        config.get(FIELD_VISIBILITY_DISABLED), list
+    ):
+        config[FIELD_VISIBILITY_DISABLED] = []
     return config
 
 
@@ -61,3 +73,17 @@ def chatgpt_required_fields(config: dict[str, str]) -> dict[str, str]:
         "question": str(config.get(CHATGPT_CONFIG_QUESTION_FIELD, "Question")),
         "grammar": str(config.get(CHATGPT_CONFIG_GRAMMAR_FIELD, "Grammar")),
     }
+
+
+def get_field_visibility_map(config: dict[str, str]) -> dict[str, list[str]]:
+    raw = config.get(FIELD_VISIBILITY_MAP)
+    if isinstance(raw, dict):
+        return {str(k): [str(vv) for vv in v] for k, v in raw.items() if isinstance(v, list)}
+    return {}
+
+
+def get_field_visibility_disabled(config: dict[str, str]) -> list[str]:
+    raw = config.get(FIELD_VISIBILITY_DISABLED)
+    if isinstance(raw, list):
+        return [str(v) for v in raw]
+    return []

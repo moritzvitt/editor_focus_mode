@@ -1,15 +1,31 @@
 from __future__ import annotations
 
 import json
+import time
+
+from aqt.qt import QTimer
 from pathlib import Path
 
 from .browser_utils import current_browser
+from .config import (
+    get_addon_config,
+    get_field_visibility_map,
+    get_field_visibility_disabled,
+    save_addon_config,
+    FIELD_VISIBILITY_DISABLED,
+)
 
-TARGET_NOTE_TYPE = "Moritz Language Reactor"
-ALLOWED_FIELDS = {"Lemma", "Cloze", "Synonyms", "Japanese Notes"}
+DEFAULT_NOTE_TYPE = "Moritz Language Reactor"
+DEFAULT_ALLOWED_FIELDS = {"Lemma", "Cloze", "Synonyms", "Japanese Notes"}
+
+_TOGGLE_BYPASS_UNTIL = 0.0
 
 
 def apply_field_visibility(editor) -> None:
+    global _TOGGLE_BYPASS_UNTIL
+    if _TOGGLE_BYPASS_UNTIL and _TOGGLE_BYPASS_UNTIL > time.time():
+        _reset_visibility(editor, _all_field_names_from_note(getattr(editor, "note", None)))
+        return
     browser = current_browser()
     if browser is None or getattr(browser, "editor", None) is None:
         return
@@ -18,15 +34,24 @@ def apply_field_visibility(editor) -> None:
     note = getattr(editor, "note", None)
     if note is None:
         return
-    try:
-        note_type_name = note.model().get("name")
-    except Exception:
+    note_type_name = _note_type_name(note)
+    if not note_type_name:
         return
-    if note_type_name != TARGET_NOTE_TYPE:
-        _reset_visibility(editor)
+    config = get_addon_config()
+    field_map = get_field_visibility_map(config)
+    if not field_map:
+        field_map = {DEFAULT_NOTE_TYPE: sorted(DEFAULT_ALLOWED_FIELDS)}
+    if note_type_name not in field_map:
+        _, _, all_names = _allowed_field_indices(note, [])
+        _reset_visibility(editor, all_names)
         return
-    allowed_indices, field_count, all_names = _allowed_field_indices(note)
-    js = _hide_fields_js(allowed_indices, field_count, all_names)
+    if note_type_name in get_field_visibility_disabled(config):
+        _, _, all_names = _allowed_field_indices(note, [])
+        _reset_visibility(editor, all_names)
+        return
+    allowed = field_map.get(note_type_name) or []
+    allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
+    js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
     try:
         editor.web.eval(js)
         editor.web.eval(f"setTimeout(function(){{ {js} }}, 50);")
@@ -37,35 +62,32 @@ def apply_field_visibility(editor) -> None:
 
 
 def editor_will_load_note(js: str, note, editor) -> str:
+    global _TOGGLE_BYPASS_UNTIL
+    if _TOGGLE_BYPASS_UNTIL and _TOGGLE_BYPASS_UNTIL > time.time():
+        _, _, all_names = _allowed_field_indices(note, [])
+        return js + _reset_fields_js(all_names)
     browser = current_browser()
     if browser is None or getattr(browser, "editor", None) is None:
         return js
     if editor is not browser.editor:
         return js
-    try:
-        note_type_name = note.model().get("name")
-    except Exception:
+    note_type_name = _note_type_name(note)
+    if not note_type_name:
         return js
-    if note_type_name == TARGET_NOTE_TYPE:
-        allowed_indices, field_count, all_names = _allowed_field_indices(note)
-        return js + _hide_fields_js(allowed_indices, field_count, all_names)
-    return js + _reset_fields_js()
+    config = get_addon_config()
+    field_map = get_field_visibility_map(config)
+    if not field_map:
+        field_map = {DEFAULT_NOTE_TYPE: sorted(DEFAULT_ALLOWED_FIELDS)}
+    if note_type_name in get_field_visibility_disabled(config) or note_type_name not in field_map:
+        _, _, all_names = _allowed_field_indices(note, [])
+        return js + _reset_fields_js(all_names)
+    allowed = field_map.get(note_type_name) or []
+    allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
+    return js + _hide_fields_js(allowed_indices, field_count, all_names, allowed)
 
 
-def _reset_visibility(editor) -> None:
-    js = """
-    (function() {
-      const candidates = document.querySelectorAll('[data-field-name]');
-      if (candidates.length) {
-        candidates.forEach((el) => { el.style.display = ''; });
-        return;
-      }
-      const rowSelectors = ['.field', '.editor-field', '.field-row'];
-      let rows = [];
-      rowSelectors.forEach((sel) => { rows = rows.concat(Array.from(document.querySelectorAll(sel))); });
-      rows.forEach((row) => { row.style.display = ''; });
-    })();
-    """
+def _reset_visibility(editor, all_names: list[str]) -> None:
+    js = _reset_fields_js(all_names)
     try:
         editor.web.eval(js)
     except Exception:
@@ -119,9 +141,12 @@ def _debug_dump_fields(editor) -> None:
 
 
 def _hide_fields_js(
-    allowed_indices: list[int], field_count: int, all_names: list[str]
+    allowed_indices: list[int],
+    field_count: int,
+    all_names: list[str],
+    allowed_fields: list[str],
 ) -> str:
-    allowed = json.dumps(sorted(ALLOWED_FIELDS))
+    allowed = json.dumps(sorted(allowed_fields or list(DEFAULT_ALLOWED_FIELDS)))
     all_fields = json.dumps(sorted(set(all_names)))
     allowed_idx = json.dumps(sorted(allowed_indices))
     return f"""
@@ -194,7 +219,7 @@ def _hide_fields_js(
     """
 
 
-def _allowed_field_indices(note) -> tuple[list[int], int, list[str]]:
+def _allowed_field_indices(note, allowed_fields: list[str]) -> tuple[list[int], int, list[str]]:
     try:
         flds = note.model().get("flds") or []
     except Exception:
@@ -205,26 +230,132 @@ def _allowed_field_indices(note) -> tuple[list[int], int, list[str]]:
         name = fld.get("name")
         if name:
             all_names.append(str(name))
-        if fld.get("name") in ALLOWED_FIELDS:
+        if fld.get("name") in set(allowed_fields):
             allowed.append(idx)
     return allowed, len(flds), all_names
 
 
-def _reset_fields_js() -> str:
-    return """
-    (function() {
-      const reset = () => {
+def _all_field_names_from_note(note) -> list[str]:
+    if note is None:
+        return []
+    try:
+        flds = note.model().get("flds") or []
+    except Exception:
+        return []
+    return [str(f.get("name")) for f in flds if f.get("name")]
+
+
+def _note_type_name(note) -> str | None:
+    try:
+        return note.model().get("name")
+    except Exception:
+        return None
+
+
+def toggle_field_visibility(editor) -> None:
+    global _TOGGLE_BYPASS_UNTIL
+    note = getattr(editor, "note", None)
+    if note is None:
+        return
+    note_type_name = _note_type_name(note)
+    if not note_type_name:
+        return
+    config = get_addon_config()
+    disabled = get_field_visibility_disabled(config)
+    if note_type_name in disabled:
+        disabled = [n for n in disabled if n != note_type_name]
+    else:
+        disabled.append(note_type_name)
+    config[FIELD_VISIBILITY_DISABLED] = disabled
+    save_addon_config(config)
+    if note_type_name in disabled:
+        _TOGGLE_BYPASS_UNTIL = time.time() + 0.5
+    _force_reload_with_visibility(editor)
+
+
+def _force_reload_with_visibility(editor) -> None:
+    note = getattr(editor, "note", None)
+    if note is None:
+        return
+    try:
+        data = [
+            (fld, editor.mw.col.media.escape_media_filenames(val))
+            for fld, val in note.items()
+        ]
+    except Exception:
+        return
+    try:
+        note_type = note.model()
+        flds = note_type.get("flds") or []
+        collapsed = [fld.get("collapsed", False) for fld in flds]
+        cloze_fields_ords = editor.mw.col.models.cloze_fields(note.mid)
+        cloze_fields = [ord in cloze_fields_ords for ord in range(len(flds))]
+        plain_texts = [fld.get("plainText", False) for fld in flds]
+        descriptions = [fld.get("description", "") for fld in flds]
+        notetype_meta = {"id": note.mid, "modTime": note_type.get("mod")}
+    except Exception:
+        return
+    js = f"""
+        setFields({json.dumps(data)});
+        setIsImageOcclusion({json.dumps(editor.current_notetype_is_image_occlusion())});
+        setNotetypeMeta({json.dumps(notetype_meta)});
+        setCollapsed({json.dumps(collapsed)});
+        setClozeFields({json.dumps(cloze_fields)});
+        setPlainTexts({json.dumps(plain_texts)});
+        setDescriptions({json.dumps(descriptions)});
+        setFonts({json.dumps(editor.fonts())});
+        focusField(null);
+        setNoteId({json.dumps(note.id)});
+        triggerChanges();
+    """
+    try:
+        editor.web.evalWithCallback(
+            f'require("anki/ui").loaded.then(() => {{ {js} }})',
+            lambda _res: apply_field_visibility(editor),
+        )
+    except Exception:
+        pass
+
+
+def editor_init_buttons(buttons: list[str], editor) -> None:
+    b = editor.addButton(
+        icon="text_clear",
+        cmd="prompt_addon_toggle_fields",
+        func=lambda ed: toggle_field_visibility(ed),
+        tip="Toggle hidden fields",
+        label="",
+        id="prompt-addon-toggle-fields",
+        rightside=False,
+    )
+    buttons.append(b)
+
+
+def _reset_fields_js(all_names: list[str]) -> str:
+    all_fields = json.dumps(sorted(set(all_names)))
+    return f"""
+    (function() {{
+      const allFieldNames = new Set({all_fields});
+      const reset = () => {{
         const candidates = document.querySelectorAll('[data-field-name]');
-        if (candidates.length) {
-          candidates.forEach((el) => { el.style.display = ''; });
-        }
+        if (candidates.length) {{
+          candidates.forEach((el) => {{ el.style.display = ''; }});
+        }}
         const rowSelectors = ['.field', '.editor-field', '.field-row', '.field-row-wrapper'];
         let rows = [];
-        rowSelectors.forEach((sel) => { rows = rows.concat(Array.from(document.querySelectorAll(sel))); });
-        rows.forEach((row) => { row.style.display = ''; });
-      };
+        rowSelectors.forEach((sel) => {{ rows = rows.concat(Array.from(document.querySelectorAll(sel))); }});
+        rows.forEach((row) => {{ row.style.display = ''; }});
+        const allEls = Array.from(document.querySelectorAll('body *'));
+        allEls.forEach((el) => {{
+          const text = el.textContent ? el.textContent.trim() : '';
+          if (!text) return;
+          if (!allFieldNames.has(text)) return;
+          el.style.display = '';
+          const row = el.closest('.field, .editor-field, .field-row, .field-row-wrapper');
+          if (row) row.style.display = '';
+        }});
+      }};
       reset();
       setTimeout(reset, 50);
       setTimeout(reset, 200);
-    })();
+    }})();
     """

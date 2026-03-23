@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import json
 
 from aqt import mw, qconnect
 from aqt.qt import (
@@ -11,6 +12,7 @@ from aqt.qt import (
     QFormLayout,
     QKeySequence,
     QLineEdit,
+    QPlainTextEdit,
     QMenu,
     Qt,
 )
@@ -28,6 +30,10 @@ from .config import (
     CHATGPT_MODE_OFF,
     CHATGPT_MODE_SINGLE,
     get_addon_config,
+    get_field_visibility_map,
+    get_field_visibility_disabled,
+    FIELD_VISIBILITY_MAP,
+    FIELD_VISIBILITY_DISABLED,
     save_addon_config,
 )
 from .flow import run_chatgpt_helper, run_chatgpt_helper_from_editor
@@ -73,6 +79,15 @@ def run_open_config() -> None:
     )
     layout.addRow("Grammar Field:", chatgpt_grammar_edit)
 
+    field_map_edit = QPlainTextEdit()
+    field_map_edit.setPlaceholderText(
+        '{"Note Type Name": ["Field1", "Field2"]}'
+    )
+    field_map_edit.setPlainText(
+        json.dumps(get_field_visibility_map(config), indent=2, ensure_ascii=False)
+    )
+    layout.addRow("Field Visibility Map (JSON):", field_map_edit)
+
     buttons = QDialogButtonBox(
         QDialogButtonBox.StandardButton.Ok
         | QDialogButtonBox.StandardButton.Cancel
@@ -96,6 +111,19 @@ def run_open_config() -> None:
     config[CHATGPT_CONFIG_GRAMMAR_FIELD] = (
         chatgpt_grammar_edit.text().strip() or "Grammar"
     )
+    try:
+        parsed = json.loads(field_map_edit.toPlainText().strip() or "{}")
+        if not isinstance(parsed, dict):
+            raise ValueError("Field visibility map must be a JSON object.")
+        normalized: dict[str, list[str]] = {}
+        for key, val in parsed.items():
+            if not isinstance(val, list):
+                raise ValueError(f"Notetype '{key}' must map to a list of fields.")
+            normalized[str(key)] = [str(v) for v in val]
+        config[FIELD_VISIBILITY_MAP] = normalized
+    except Exception as exc:
+        showInfo(f"Invalid field visibility map. {exc}")
+        return
     save_addon_config(config)
     refresh_chatgpt_shortcut()
     showInfo("Configuration saved.")
