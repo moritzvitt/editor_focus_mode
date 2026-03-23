@@ -42,10 +42,12 @@ def apply_field_visibility(editor) -> None:
     if not field_map:
         field_map = {DEFAULT_NOTE_TYPE: sorted(DEFAULT_ALLOWED_FIELDS)}
     if note_type_name not in field_map:
+        _update_toggle_button_label(editor)
         _, _, all_names = _allowed_field_indices(note, [])
         _reset_visibility(editor, all_names)
         return
     if note_type_name in get_field_visibility_disabled(config):
+        _update_toggle_button_label(editor)
         _, _, all_names = _allowed_field_indices(note, [])
         _reset_visibility(editor, all_names)
         return
@@ -58,6 +60,7 @@ def apply_field_visibility(editor) -> None:
         editor.web.eval(f"setTimeout(function(){{ {js} }}, 200);")
     except Exception:
         pass
+    _update_toggle_button_label(editor)
     _debug_dump_fields(editor)
 
 
@@ -262,6 +265,9 @@ def toggle_field_visibility(editor) -> None:
         return
     config = get_addon_config()
     disabled = get_field_visibility_disabled(config)
+    field_map = get_field_visibility_map(config)
+    if not field_map:
+        field_map = {DEFAULT_NOTE_TYPE: sorted(DEFAULT_ALLOWED_FIELDS)}
     if note_type_name in disabled:
         disabled = [n for n in disabled if n != note_type_name]
     else:
@@ -270,64 +276,74 @@ def toggle_field_visibility(editor) -> None:
     save_addon_config(config)
     if note_type_name in disabled:
         _TOGGLE_BYPASS_UNTIL = time.time() + 0.5
-    _force_reload_with_visibility(editor)
+    else:
+        _TOGGLE_BYPASS_UNTIL = 0.0
+    allowed = field_map.get(note_type_name) or []
+    allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
+    if note_type_name in disabled:
+        _reset_visibility(editor, all_names)
+    else:
+        js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+        try:
+            editor.web.eval(js)
+        except Exception:
+            pass
+    QTimer.singleShot(150, lambda: _update_toggle_button_label(editor))
+    QTimer.singleShot(300, lambda: _update_toggle_button_label(editor))
 
 
-def _force_reload_with_visibility(editor) -> None:
-    note = getattr(editor, "note", None)
-    if note is None:
-        return
-    try:
-        data = [
-            (fld, editor.mw.col.media.escape_media_filenames(val))
-            for fld, val in note.items()
-        ]
-    except Exception:
-        return
-    try:
-        note_type = note.model()
-        flds = note_type.get("flds") or []
-        collapsed = [fld.get("collapsed", False) for fld in flds]
-        cloze_fields_ords = editor.mw.col.models.cloze_fields(note.mid)
-        cloze_fields = [ord in cloze_fields_ords for ord in range(len(flds))]
-        plain_texts = [fld.get("plainText", False) for fld in flds]
-        descriptions = [fld.get("description", "") for fld in flds]
-        notetype_meta = {"id": note.mid, "modTime": note_type.get("mod")}
-    except Exception:
-        return
-    js = f"""
-        setFields({json.dumps(data)});
-        setIsImageOcclusion({json.dumps(editor.current_notetype_is_image_occlusion())});
-        setNotetypeMeta({json.dumps(notetype_meta)});
-        setCollapsed({json.dumps(collapsed)});
-        setClozeFields({json.dumps(cloze_fields)});
-        setPlainTexts({json.dumps(plain_texts)});
-        setDescriptions({json.dumps(descriptions)});
-        setFonts({json.dumps(editor.fonts())});
-        focusField(null);
-        setNoteId({json.dumps(note.id)});
-        triggerChanges();
-    """
-    try:
-        editor.web.evalWithCallback(
-            f'require("anki/ui").loaded.then(() => {{ {js} }})',
-            lambda _res: apply_field_visibility(editor),
-        )
-    except Exception:
-        pass
 
 
 def editor_init_buttons(buttons: list[str], editor) -> None:
     b = editor.addButton(
-        icon="text_clear",
+        icon=None,
         cmd="prompt_addon_toggle_fields",
         func=lambda ed: toggle_field_visibility(ed),
         tip="Toggle hidden fields",
-        label="",
+        label="Hide Fields",
         id="prompt-addon-toggle-fields",
-        rightside=False,
+        toggleable=True,
+        rightside=True,
     )
     buttons.append(b)
+
+
+def _update_toggle_button_label(editor) -> None:
+    note = getattr(editor, "note", None)
+    if note is None:
+        return
+    note_type_name = _note_type_name(note)
+    if not note_type_name:
+        return
+    config = get_addon_config()
+    field_map = get_field_visibility_map(config)
+    if not field_map:
+        field_map = {DEFAULT_NOTE_TYPE: sorted(DEFAULT_ALLOWED_FIELDS)}
+    if note_type_name not in field_map:
+        return
+    disabled = note_type_name in get_field_visibility_disabled(config)
+    label = "Show Fields" if disabled else "Hide Fields"
+    js = f"""
+    (function() {{
+      const label = "{label}";
+      const apply = () => {{
+        const btn = document.getElementById("prompt-addon-toggle-fields");
+        if (btn) {{
+          btn.textContent = label;
+          return true;
+        }}
+        return false;
+      }};
+      if (!apply()) {{
+        setTimeout(apply, 50);
+        setTimeout(apply, 200);
+      }}
+    }})();
+    """
+    try:
+        editor.web.eval(js)
+    except Exception:
+        pass
 
 
 def _reset_fields_js(all_names: list[str]) -> str:
