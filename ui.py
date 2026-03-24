@@ -1,96 +1,30 @@
 from __future__ import annotations
 
-import sys
 import json
 
-from aqt import mw, qconnect
-from aqt.qt import (
-    QAction,
-    QActionGroup,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QKeySequence,
-    QLineEdit,
-    QPlainTextEdit,
-    QMenu,
-    Qt,
-)
-from aqt.utils import showInfo, tooltip
+from aqt import mw
+from aqt.qt import QDialog, QDialogButtonBox, QFormLayout, QPlainTextEdit
+from aqt.utils import showInfo
 
-from .config import (
-    CHATGPT_CONFIG_GRAMMAR_FIELD,
-    CHATGPT_CONFIG_LEMMA_FIELD,
-    CHATGPT_CONFIG_MODE,
-    CHATGPT_CONFIG_QUESTION_FIELD,
-    CHATGPT_CONFIG_SHORTCUT,
-    CHATGPT_CONFIG_SUBTITLE_FIELD,
-    CHATGPT_DEFAULT_SHORTCUT,
-    CHATGPT_MODE_BATCH,
-    CHATGPT_MODE_OFF,
-    CHATGPT_MODE_SINGLE,
-    get_addon_config,
-    get_field_visibility_map,
-    get_field_visibility_disabled,
-    FIELD_VISIBILITY_MAP,
-    FIELD_VISIBILITY_DISABLED,
-    save_addon_config,
-)
-from .flow import run_chatgpt_helper, run_chatgpt_helper_from_editor
-
-_CHATGPT_SHORTCUT_ACTION: QAction | None = None
-_CHATGPT_MODE_ACTIONS: dict[str, QAction] = {}
-
-
-def get_mode_actions() -> dict[str, QAction]:
-    return _CHATGPT_MODE_ACTIONS
+from .config import FIELD_VISIBILITY_MAP, get_addon_config, get_field_visibility_map, save_addon_config
 
 
 def run_open_config() -> None:
     config = get_addon_config()
     dialog = QDialog(mw)
-    dialog.setWindowTitle("Prompt Addon Configuration")
+    dialog.setWindowTitle("Editor Focus Mode Configuration")
     layout = QFormLayout(dialog)
     layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
-    chatgpt_shortcut_edit = QLineEdit()
-    chatgpt_shortcut_edit.setText(str(config.get(CHATGPT_CONFIG_SHORTCUT, "")))
-    layout.addRow("Shortcut:", chatgpt_shortcut_edit)
-
-    chatgpt_lemma_edit = QLineEdit()
-    chatgpt_lemma_edit.setText(str(config.get(CHATGPT_CONFIG_LEMMA_FIELD, "Lemma")))
-    layout.addRow("Lemma Field:", chatgpt_lemma_edit)
-
-    chatgpt_subtitle_edit = QLineEdit()
-    chatgpt_subtitle_edit.setText(
-        str(config.get(CHATGPT_CONFIG_SUBTITLE_FIELD, "Subtitle"))
-    )
-    layout.addRow("Subtitle Field:", chatgpt_subtitle_edit)
-
-    chatgpt_question_edit = QLineEdit()
-    chatgpt_question_edit.setText(
-        str(config.get(CHATGPT_CONFIG_QUESTION_FIELD, "Question"))
-    )
-    layout.addRow("Question Field (optional):", chatgpt_question_edit)
-
-    chatgpt_grammar_edit = QLineEdit()
-    chatgpt_grammar_edit.setText(
-        str(config.get(CHATGPT_CONFIG_GRAMMAR_FIELD, "Grammar"))
-    )
-    layout.addRow("Grammar Field:", chatgpt_grammar_edit)
-
     field_map_edit = QPlainTextEdit()
-    field_map_edit.setPlaceholderText(
-        '{"Note Type Name": ["Field1", "Field2"]}'
-    )
+    field_map_edit.setPlaceholderText('{"Note Type Name": ["Field1", "Field2"]}')
     field_map_edit.setPlainText(
         json.dumps(get_field_visibility_map(config), indent=2, ensure_ascii=False)
     )
-    layout.addRow("Field Visibility Map (JSON):", field_map_edit)
+    layout.addRow("Visible Fields by Note Type (JSON):", field_map_edit)
 
     buttons = QDialogButtonBox(
-        QDialogButtonBox.StandardButton.Ok
-        | QDialogButtonBox.StandardButton.Cancel
+        QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
     )
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
@@ -99,88 +33,19 @@ def run_open_config() -> None:
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
 
-    shortcut_value = chatgpt_shortcut_edit.text().strip()
-    config[CHATGPT_CONFIG_SHORTCUT] = shortcut_value or CHATGPT_DEFAULT_SHORTCUT
-    config[CHATGPT_CONFIG_LEMMA_FIELD] = chatgpt_lemma_edit.text().strip() or "Lemma"
-    config[CHATGPT_CONFIG_SUBTITLE_FIELD] = (
-        chatgpt_subtitle_edit.text().strip() or "Subtitle"
-    )
-    config[CHATGPT_CONFIG_QUESTION_FIELD] = (
-        chatgpt_question_edit.text().strip() or "Question"
-    )
-    config[CHATGPT_CONFIG_GRAMMAR_FIELD] = (
-        chatgpt_grammar_edit.text().strip() or "Grammar"
-    )
     try:
         parsed = json.loads(field_map_edit.toPlainText().strip() or "{}")
         if not isinstance(parsed, dict):
             raise ValueError("Field visibility map must be a JSON object.")
         normalized: dict[str, list[str]] = {}
-        for key, val in parsed.items():
-            if not isinstance(val, list):
+        for key, value in parsed.items():
+            if not isinstance(value, list):
                 raise ValueError(f"Notetype '{key}' must map to a list of fields.")
-            normalized[str(key)] = [str(v) for v in val]
-        config[FIELD_VISIBILITY_MAP] = normalized
+            normalized[str(key)] = [str(item) for item in value]
     except Exception as exc:
         showInfo(f"Invalid field visibility map. {exc}")
         return
+
+    config[FIELD_VISIBILITY_MAP] = normalized
     save_addon_config(config)
-    refresh_chatgpt_shortcut()
     showInfo("Configuration saved.")
-
-
-def refresh_chatgpt_shortcut() -> None:
-    global _CHATGPT_SHORTCUT_ACTION
-    config = get_addon_config()
-    sequence = str(config.get(CHATGPT_CONFIG_SHORTCUT) or CHATGPT_DEFAULT_SHORTCUT)
-    sequences = [sequence]
-    if sys.platform == "darwin":
-        normalized = sequence.replace("Command", "Meta").replace("Cmd", "Meta")
-        if "Ctrl" in normalized and "Meta" not in normalized:
-            sequences.append(normalized.replace("Ctrl", "Meta"))
-    if _CHATGPT_SHORTCUT_ACTION is None:
-        action = QAction("ChatGPT Helper Trigger", mw)
-        action.setShortcuts([QKeySequence(s) for s in sequences])
-        action.setShortcutContext(Qt.ShortcutContext.ApplicationShortcut)
-        qconnect(action.triggered, run_chatgpt_helper)
-        mw.addAction(action)
-        _CHATGPT_SHORTCUT_ACTION = action
-    else:
-        _CHATGPT_SHORTCUT_ACTION.setShortcuts([QKeySequence(s) for s in sequences])
-
-
-def set_chatgpt_mode(mode: str) -> None:
-    config = get_addon_config()
-    config[CHATGPT_CONFIG_MODE] = mode
-    save_addon_config(config)
-    for key, action in _CHATGPT_MODE_ACTIONS.items():
-        action.setChecked(key == mode)
-    tooltip(f"ChatGPT Helper mode: {mode}")
-
-
-def add_chatgpt_menu() -> None:
-    menu = QMenu("Prompt Generation", mw)
-    group = QActionGroup(menu)
-    group.setExclusive(True)
-    options = [
-        ("Off", CHATGPT_MODE_OFF),
-        ("On (Individual Prompt)", CHATGPT_MODE_SINGLE),
-        ("On (Bulk: 5 notes)", CHATGPT_MODE_BATCH),
-    ]
-    for label, mode in options:
-        action = QAction(label, menu)
-        action.setCheckable(True)
-        group.addAction(action)
-        menu.addAction(action)
-        _CHATGPT_MODE_ACTIONS[mode] = action
-        qconnect(action.triggered, lambda _checked=False, m=mode: set_chatgpt_mode(m))
-    current = str(get_addon_config().get(CHATGPT_CONFIG_MODE) or CHATGPT_MODE_OFF)
-    if current in _CHATGPT_MODE_ACTIONS:
-        _CHATGPT_MODE_ACTIONS[current].setChecked(True)
-    mw.form.menuTools.addMenu(menu)
-
-
-def on_editor_context_menu(editor, menu) -> None:
-    action = QAction("Ask ChatGPT", menu)
-    qconnect(action.triggered, lambda _checked=False, e=editor: run_chatgpt_helper_from_editor(e))
-    menu.addAction(action)
