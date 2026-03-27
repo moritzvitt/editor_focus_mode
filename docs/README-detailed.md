@@ -129,10 +129,10 @@ editor_focus_mode/
 
 ### Further Reading
 
-- Architecture overview: [`architecture.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/architecture.md)
-- Wrapper reference: [`wrappers.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/wrappers.md)
-- User walkthrough: [`user-flow.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/user-flow.md)
+- Architecture overview: [`architecture.md`](./architecture.md)
+- Wrapper reference: [`wrappers.md`](./wrappers.md)
+- User walkthrough: [`user-flow.md`](./user-flow.md)
 
 ## License
 
-This addon is released under the MIT License. See [`LICENSE`](/Users/moritzvitt/src/addons/editor_focus_mode/LICENSE) for details.
+This addon is released under the MIT License. See [`LICENSE`](../LICENSE) for details.

@@ -11,11 +11,11 @@ The add-on has one main job:
 3. Inject JavaScript into Anki's editor webview to hide the rest.
 4. Let the user temporarily override that behavior with a toolbar button.
 
-At runtime, most behavior starts from Anki hooks registered in [`__init__.py`](/Users/moritzvitt/src/addons/editor_focus_mode/__init__.py).
+At runtime, most behavior starts from Anki hooks registered in [`__init__.py`](../__init__.py).
 
 ## Module Overview
 
-### [`__init__.py`](/Users/moritzvitt/src/addons/editor_focus_mode/__init__.py)
+### [`__init__.py`](../__init__.py)
 
 This is the entry point. It does not contain business logic itself. Its job is to wire the add-on into Anki.
 
@@ -28,7 +28,7 @@ Responsibilities:
   - DOM updates after a note loads
   - adding the custom toolbar button
 
-### [`config.py`](/Users/moritzvitt/src/addons/editor_focus_mode/config.py)
+### [`config.py`](../config.py)
 
 This module is the configuration layer.
 
@@ -50,7 +50,7 @@ Important config keys:
 
 The toggle button does not store state in the UI. It stores state in `field_visibility_disabled`.
 
-### [`ui.py`](/Users/moritzvitt/src/addons/editor_focus_mode/ui.py)
+### [`ui.py`](../ui.py)
 
 This module contains the configuration dialog.
 
@@ -67,7 +67,7 @@ What it does:
 
 This is the only user-facing settings UI in the project right now.
 
-### [`browser_utils.py`](/Users/moritzvitt/src/addons/editor_focus_mode/browser_utils.py)
+### [`browser_utils.py`](../browser_utils.py)
 
 This module tracks the current Browser window and provides helpers for working with notes selected there.
 
@@ -78,7 +78,7 @@ Main functions:
 
 For the current field-hiding feature, the most important function is `current_browser()`. The hiding code uses it to make sure it only acts on the Browser editor, not every editor Anki may open.
 
-### [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
+### [`field_visibility.py`](../field_visibility.py)
 
 This is the core module.
 
@@ -100,7 +100,7 @@ Main public functions:
 
 When Anki loads the add-on:
 
-1. [`__init__.py`](/Users/moritzvitt/src/addons/editor_focus_mode/__init__.py) runs.
+1. [`__init__.py`](../__init__.py) runs.
 2. A Tools menu action is created and connected to `run_open_config()`.
 3. Hook handlers are registered:
    - browser open/show -> `register_browser_instance()`
@@ -272,7 +272,7 @@ The label is derived from config state, not from inspecting the DOM.
 
 ## Why `current_browser()` Matters
 
-The code in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py) intentionally checks that the editor being processed is the Browser editor.
+The code in [`field_visibility.py`](../field_visibility.py) intentionally checks that the editor being processed is the Browser editor.
 
 Without that guard, the same hide logic might affect:
 
@@ -322,8 +322,8 @@ Stored by Anki:
 
 Stored in Python module globals:
 
-- `_LAST_BROWSER` in [`browser_utils.py`](/Users/moritzvitt/src/addons/editor_focus_mode/browser_utils.py)
-- `_TOGGLE_BYPASS_UNTIL` in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
+- `_LAST_BROWSER` in [`browser_utils.py`](../browser_utils.py)
+- `_TOGGLE_BYPASS_UNTIL` in [`field_visibility.py`](../field_visibility.py)
 ### 3. Editor DOM state
 
 Stored in the webview:
@@ -335,11 +335,11 @@ Stored in the webview:
 
 If you want to trace behavior while reading the code, start in this order:
 
-1. [`__init__.py`](/Users/moritzvitt/src/addons/editor_focus_mode/__init__.py)
-2. [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
-3. [`config.py`](/Users/moritzvitt/src/addons/editor_focus_mode/config.py)
-4. [`ui.py`](/Users/moritzvitt/src/addons/editor_focus_mode/ui.py)
-5. [`browser_utils.py`](/Users/moritzvitt/src/addons/editor_focus_mode/browser_utils.py)
+1. [`__init__.py`](../__init__.py)
+2. [`field_visibility.py`](../field_visibility.py)
+3. [`config.py`](../config.py)
+4. [`ui.py`](../ui.py)
+5. [`browser_utils.py`](../browser_utils.py)
 
 For runtime inspection:
 
@@ -358,7 +358,7 @@ These are useful to know while reading the code:
 
 If your goal is understanding rather than changing it, this order usually feels best:
 
-1. Read [`__init__.py`](/Users/moritzvitt/src/addons/editor_focus_mode/__init__.py) to see the entry points.
-2. Read `apply_field_visibility()` and `toggle_field_visibility()` in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py).
-3. Read the helpers in [`config.py`](/Users/moritzvitt/src/addons/editor_focus_mode/config.py).
+1. Read [`__init__.py`](../__init__.py) to see the entry points.
+2. Read `apply_field_visibility()` and `toggle_field_visibility()` in [`field_visibility.py`](../field_visibility.py).
+3. Read the helpers in [`config.py`](../config.py).
 4. Read `_hide_fields_js()` and `_reset_fields_js()` last, because they are the lowest-level DOM details.

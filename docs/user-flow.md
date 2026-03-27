@@ -7,15 +7,15 @@ This document explains the add-on by following one normal user journey:
 3. click `Show Fields` to unhide everything
 4. click `Hide Fields` to hide non-allowed fields again
 
-It is intentionally higher-level than [`docs/architecture.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/architecture.md).
+It is intentionally higher-level than [`architecture.md`](./architecture.md).
 
 ## 1. Browser Opens
 
-When Anki loads the add-on, [`__init__.py`](/Users/moritzvitt/src/addons/editor_focus_mode/__init__.py) registers the menu action and the relevant hooks.
+When Anki loads the add-on, [`__init__.py`](../__init__.py) registers the menu action and the relevant hooks.
 
 When the Browser window is created, Anki fires a browser hook and the add-on calls:
 
-- `register_browser_instance(browser)` in [`browser_utils.py`](/Users/moritzvitt/src/addons/editor_focus_mode/browser_utils.py)
+- `register_browser_instance(browser)` in [`browser_utils.py`](../browser_utils.py)
 
 That stores a reference to the current Browser window in `_LAST_BROWSER`.
 
@@ -34,7 +34,7 @@ Two hook-driven steps happen around that load.
 
 Anki calls:
 
-- `editor_will_load_note(js, note, editor)` in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
+- `editor_will_load_note(js, note, editor)` in [`field_visibility.py`](../field_visibility.py)
 
 This function decides what JavaScript should be appended to the editor load process.
 
@@ -54,7 +54,7 @@ Based on those checks, it appends either:
 
 Anki then calls:
 
-- `apply_field_visibility(editor)` in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
+- `apply_field_visibility(editor)` in [`field_visibility.py`](../field_visibility.py)
 
 This is the second pass. It applies the same decision again, but now against the live DOM using `editor.web.eval(...)`.
 
@@ -74,7 +74,7 @@ At the end of this step, the user sees the note in the Browser editor with the c
 
 The toolbar button is created by:
 
-- `editor_init_buttons(buttons, editor)` in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
+- `editor_init_buttons(buttons, editor)` in [`field_visibility.py`](../field_visibility.py)
 
 When the user clicks the button, Anki calls:
 
@@ -146,7 +146,7 @@ There are three important pieces of state during this interaction.
 
 ### Browser state
 
-- `_LAST_BROWSER` in [`browser_utils.py`](/Users/moritzvitt/src/addons/editor_focus_mode/browser_utils.py)
+- `_LAST_BROWSER` in [`browser_utils.py`](../browser_utils.py)
 - tells the add-on which Browser instance is current
 
 ### Persistent config state
@@ -158,7 +158,7 @@ These live in Anki config and survive between interactions.
 
 ### Short-lived runtime state
 
-- `_TOGGLE_BYPASS_UNTIL` in [`field_visibility.py`](/Users/moritzvitt/src/addons/editor_focus_mode/field_visibility.py)
+- `_TOGGLE_BYPASS_UNTIL` in [`field_visibility.py`](../field_visibility.py)
 
 This is a timing flag used during toggle transitions so the note does not immediately get re-hidden during reload timing.
 
