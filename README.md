@@ -9,6 +9,10 @@ An Anki add-on for the Browser editor that hides non-relevant note fields based 
 - lets the user hide non-allowed fields again on the next click
 - adds a layout button that rotates through the available field subsets for the current note type
 
+## Demo
+
+- [Demo video](./docs/assets/Screen%20Recording%202026-03-27%20at%2014.25.20.mov)
+
 ## Main Files
 
 - [`__init__.py`](./__init__.py): hook registration
