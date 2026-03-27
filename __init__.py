@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from aqt import gui_hooks, mw, qconnect
-from aqt.qt import QAction
+from aqt import gui_hooks
 
 from .browser_utils import register_browser_instance
 from .field_visibility import (
@@ -9,12 +8,6 @@ from .field_visibility import (
     editor_will_load_note,
     editor_init_buttons,
 )
-from .ui import run_open_config
-
-
-action = QAction("Editor Focus Mode Configuration", mw)
-qconnect(action.triggered, run_open_config)
-mw.form.menuTools.addAction(action)
 
 if hasattr(gui_hooks, "browser_menus_did_init"):
     gui_hooks.browser_menus_did_init.append(register_browser_instance)

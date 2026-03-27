@@ -14,8 +14,6 @@ An Anki add-on for the Browser editor that hides non-relevant note fields based 
 - [`field_visibility.py`](./field_visibility.py): hide/show logic
 - [`config.py`](./config.py): config helpers
 - [`browser_utils.py`](./browser_utils.py): Browser tracking
-- [`ui.py`](./ui.py): config dialog
-
 ## Help Wanted
 
 The main hard parts are:

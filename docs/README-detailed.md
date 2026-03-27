@@ -24,7 +24,7 @@ Alternatively, you can install it directly from Anki by entering the addon code 
 
 ### Basic Usage
 
-1. Open Anki and go to **Tools → Editor Focus Mode Configuration**
+1. Open Anki's add-on config for this add-on
 2. Configure which fields should be visible for each note type
 3. When editing notes, only the configured fields will be visible
 4. Use the **"Hide Fields"** button in the editor to temporarily show all fields
@@ -37,7 +37,7 @@ Alternatively, you can install it directly from Anki by entering the addon code 
 
 ## Configuration
 
-The configuration is done through a JSON editor accessible via **Tools → Editor Focus Mode Configuration**.
+The configuration is done through Anki's native add-on config system with [`config.json`](../config.json) providing the defaults and [`config.md`](../config.md) documenting the keys.
 
 ### Field Visibility Map
 
@@ -121,8 +121,9 @@ editor_focus_mode/
 ├── __init__.py
 ├── config.py
 ├── field_visibility.py
-├── ui.py
 ├── browser_utils.py
+├── config.json
+├── config.md
 ├── manifest.json
 └── docs/
 ```

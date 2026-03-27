@@ -50,23 +50,6 @@ Important config keys:
 
 The toggle button does not store state in the UI. It stores state in `field_visibility_disabled`.
 
-### [`ui.py`](../ui.py)
-
-This module contains the configuration dialog.
-
-Main function:
-
-- `run_open_config()`
-
-What it does:
-
-1. Loads current config.
-2. Opens a dialog with a JSON text editor.
-3. Validates that the JSON is a dictionary of note type names to field lists.
-4. Writes the normalized result back to config.
-
-This is the only user-facing settings UI in the project right now.
-
 ### [`browser_utils.py`](../browser_utils.py)
 
 This module tracks the current Browser window and provides helpers for working with notes selected there.
@@ -101,8 +84,7 @@ Main public functions:
 When Anki loads the add-on:
 
 1. [`__init__.py`](../__init__.py) runs.
-2. A Tools menu action is created and connected to `run_open_config()`.
-3. Hook handlers are registered:
+2. Hook handlers are registered:
    - browser open/show -> `register_browser_instance()`
    - editor will load note -> `editor_will_load_note()`
    - editor did load note -> `apply_field_visibility()`
@@ -288,9 +270,7 @@ So the browser-tracking utility acts like a scope boundary for the feature.
 The most important active relationships are:
 
 - `__init__.py`
-  - registers hooks and menu action
-- menu action
-  - `run_open_config()`
+  - registers hooks
 - browser hook
   - `register_browser_instance()`
 - `editor_will_load_note`
@@ -338,8 +318,7 @@ If you want to trace behavior while reading the code, start in this order:
 1. [`__init__.py`](../__init__.py)
 2. [`field_visibility.py`](../field_visibility.py)
 3. [`config.py`](../config.py)
-4. [`ui.py`](../ui.py)
-5. [`browser_utils.py`](../browser_utils.py)
+4. [`browser_utils.py`](../browser_utils.py)
 
 For runtime inspection:
 
