@@ -100,34 +100,20 @@ def _reset_visibility(editor, all_names: list[str]) -> None:
 def _debug_dump_fields(editor) -> None:
     js = """
     (function() {
-      const names = [];
-      const candidates = document.querySelectorAll('[data-field-name]');
-      candidates.forEach((el) => names.push(el.getAttribute('data-field-name')));
-      let rows = [];
-      const rowSelectors = ['.field', '.editor-field', '.field-row', '.field-row-wrapper'];
-      rowSelectors.forEach((sel) => { rows = rows.concat(Array.from(document.querySelectorAll(sel))); });
-      const editables = Array.from(document.querySelectorAll('[contenteditable="true"]'));
-      const editableContainers = editables.map((el) => {
-        const container = el.closest('.field, .editor-field, .field-row, .field-row-wrapper, .anki-field, .editor-row, .row') || el.parentElement;
-        if (!container) return null;
-        return {
-          tag: container.tagName,
-          id: container.id || null,
-          class: container.className || null,
-        };
+      const rows = Array.from(document.querySelectorAll('.field-container'));
+      const names = rows.map((row) => {
+        const nameEl = row.querySelector('.label-name');
+        return nameEl ? nameEl.textContent.trim() : null;
       }).filter(Boolean);
-      if (!names.length) {
-        rows.forEach((row) => {
-          const nameEl = row.querySelector('.fieldname, .field-name, .name, label, .label, .title');
-          if (nameEl) names.push(nameEl.textContent.trim());
-        });
-      }
+      const rowIndices = rows.map((row) => row.getAttribute('data-index'));
+      const editorFields = Array.from(document.querySelectorAll('.editor-field'));
+      const labels = Array.from(document.querySelectorAll('.label-name')).map((el) => el.textContent.trim());
       return JSON.stringify({
-        dataFieldCount: candidates.length,
         rowCount: rows.length,
+        editorFieldCount: editorFields.length,
+        labelCount: labels.length,
         names,
-        editableCount: editables.length,
-        editableContainers
+        rowIndices
       });
     })();
     """
@@ -150,69 +136,43 @@ def _hide_fields_js(
     allowed_fields: list[str],
 ) -> str:
     allowed = json.dumps(sorted(allowed_fields or list(DEFAULT_ALLOWED_FIELDS)))
-    all_fields = json.dumps(sorted(set(all_names)))
     allowed_idx = json.dumps(sorted(allowed_indices))
     return f"""
     (function() {{
       const allowed = new Set({allowed});
-      const allFieldNames = new Set({all_fields});
       const allowedIdx = new Set({allowed_idx});
       const totalFields = {int(field_count)};
-      const headerSelectors = '.fieldname, .field-name, .name, label, .label, .title';
+      const hiddenMarker = 'data-efm-hidden';
+      const rowSelector = '.field-container';
+      const labelSelector = '.label-name';
+      const toInt = (value) => {{
+        const parsed = Number.parseInt(value ?? '', 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      }};
+      const setVisible = (el) => {{
+        if (!el) return;
+        el.removeAttribute(hiddenMarker);
+        el.style.display = '';
+      }};
+      const setHidden = (el) => {{
+        if (!el) return;
+        el.setAttribute(hiddenMarker, '1');
+        el.style.display = 'none';
+      }};
       const apply = () => {{
-        const candidates = document.querySelectorAll('[data-field-name]');
-        if (candidates.length) {{
-          candidates.forEach((el) => {{
-            const name = el.getAttribute('data-field-name');
-            el.style.display = allowed.has(name) ? '' : 'none';
-          }});
-        }}
-        const rowSelectors = ['.field', '.editor-field', '.field-row', '.field-row-wrapper'];
-        let rows = [];
-        rowSelectors.forEach((sel) => {{
-          const found = Array.from(document.querySelectorAll(sel));
-          if (found.length > rows.length) rows = found;
-        }});
+        const rows = Array.from(document.querySelectorAll(rowSelector));
         rows.forEach((row, idx) => {{
-          let name = null;
-          const nameEl = row.querySelector(headerSelectors);
-          if (nameEl) {{
-            name = nameEl.textContent.trim();
+          const nameEl = row.querySelector(labelSelector);
+          const name = nameEl && nameEl.textContent ? nameEl.textContent.trim() : '';
+          const dataIndex = toInt(row.getAttribute('data-index'));
+          const fallbackIndex = dataIndex === null ? idx : dataIndex;
+          const matchesByName = Boolean(name) && allowed.has(name);
+          const matchesByIndex = Boolean(totalFields && rows.length >= totalFields && allowedIdx.has(fallbackIndex));
+          if (matchesByName || matchesByIndex) {{
+            setVisible(row);
+          }} else {{
+            setHidden(row);
           }}
-          if (!name) {{
-            const dataName = row.getAttribute('data-field-name');
-            if (dataName) name = dataName;
-          }}
-          if (name) {{
-            row.style.display = allowed.has(name) ? '' : 'none';
-            return;
-          }}
-          if (totalFields && rows.length >= totalFields) {{
-            row.style.display = allowedIdx.has(idx) ? '' : 'none';
-          }}
-        }});
-        const headers = Array.from(document.querySelectorAll(headerSelectors));
-        headers.forEach((el) => {{
-          const text = el.textContent ? el.textContent.trim() : '';
-          if (!text) return;
-          if (allowed.has(text)) return;
-          el.style.display = 'none';
-          const row = el.closest('.field, .editor-field, .field-row, .field-row-wrapper');
-          if (row) {{
-            row.style.display = 'none';
-          }} else if (el.parentElement) {{
-            el.parentElement.style.display = 'none';
-          }}
-        }});
-        const allEls = Array.from(document.querySelectorAll('body *'));
-        allEls.forEach((el) => {{
-          const text = el.textContent ? el.textContent.trim() : '';
-          if (!text) return;
-          if (!allFieldNames.has(text)) return;
-          if (allowed.has(text)) return;
-          el.style.display = 'none';
-          const row = el.closest('.field, .editor-field, .field-row, .field-row-wrapper');
-          if (row) row.style.display = 'none';
         }});
       }};
       apply();
@@ -356,27 +316,19 @@ def _update_toggle_button_label(editor) -> None:
 
 
 def _reset_fields_js(all_names: list[str]) -> str:
-    all_fields = json.dumps(sorted(set(all_names)))
     return f"""
     (function() {{
-      const allFieldNames = new Set({all_fields});
+      const hiddenMarker = 'data-efm-hidden';
       const reset = () => {{
-        const candidates = document.querySelectorAll('[data-field-name]');
-        if (candidates.length) {{
-          candidates.forEach((el) => {{ el.style.display = ''; }});
-        }}
-        const rowSelectors = ['.field', '.editor-field', '.field-row', '.field-row-wrapper'];
-        let rows = [];
-        rowSelectors.forEach((sel) => {{ rows = rows.concat(Array.from(document.querySelectorAll(sel))); }});
-        rows.forEach((row) => {{ row.style.display = ''; }});
-        const allEls = Array.from(document.querySelectorAll('body *'));
-        allEls.forEach((el) => {{
-          const text = el.textContent ? el.textContent.trim() : '';
-          if (!text) return;
-          if (!allFieldNames.has(text)) return;
+        const rows = Array.from(document.querySelectorAll('.field-container'));
+        rows.forEach((row) => {{
+          row.removeAttribute(hiddenMarker);
+          row.style.display = '';
+        }});
+        const marked = Array.from(document.querySelectorAll('[' + hiddenMarker + '="1"]'));
+        marked.forEach((el) => {{
+          el.removeAttribute(hiddenMarker);
           el.style.display = '';
-          const row = el.closest('.field, .editor-field, .field-row, .field-row-wrapper');
-          if (row) row.style.display = '';
         }});
       }};
       reset();
