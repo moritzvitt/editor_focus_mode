@@ -269,7 +269,7 @@ def editor_init_buttons(buttons: list[str], editor) -> None:
         cmd="prompt_addon_toggle_fields",
         func=lambda ed: toggle_field_visibility(ed),
         tip="Toggle hidden fields",
-        label="Hide Fields",
+        label="Show Fields",
         id="prompt-addon-toggle-fields",
         toggleable=True,
         rightside=True,
@@ -291,7 +291,7 @@ def _update_toggle_button_label(editor) -> None:
     if note_type_name not in field_map:
         return
     disabled = note_type_name in get_field_visibility_disabled(config)
-    label = "Show Fields" if disabled else "Hide Fields"
+    label = "Hide Fields" if disabled else "Show Fields"
     js = f"""
     (function() {{
       const label = "{label}";
