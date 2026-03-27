@@ -11,7 +11,11 @@ An Anki add-on for the Browser editor that hides non-relevant note fields based 
 
 ## Demo
 
-[![Watch the demo on YouTube](https://img.youtube.com/vi/6XNraKFZiZc/hqdefault.jpg)](https://youtu.be/6XNraKFZiZc)
+[▶ Watch the demo video on YouTube](https://youtu.be/6XNraKFZiZc)
+
+[![Show Only Specific Fields demo video](https://img.youtube.com/vi/6XNraKFZiZc/maxresdefault.jpg)](https://youtu.be/6XNraKFZiZc)
+
+The thumbnail above links to the demo video.
 
 ## Main Files
 
