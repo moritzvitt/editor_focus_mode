@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant User
+    participant Anki
+    participant Browser
+    participant Visibility as field_visibility.py
+    participant Config
+    participant DOM as Editor DOM
+
+    User->>Anki: Open Browser
+    Anki->>Browser: Create Browser window
+    Browser-->>Anki: Browser ready
+
+    User->>Browser: Select note
+    Browser->>Visibility: editor_will_load_note(...)
+    Visibility->>Config: Read visibility settings
+    Visibility-->>Browser: Return hide/reset JS
+    Browser->>Visibility: apply_field_visibility(editor)
+    Visibility->>Config: Read visibility settings
+    Visibility->>DOM: Hide non-allowed fields
+
+    User->>Browser: Click Show Fields
+    Browser->>Visibility: toggle_field_visibility(editor)
+    Visibility->>Config: Disable hiding for note type
+    Visibility->>DOM: Reset visibility
+    Visibility-->>Browser: Update button label
+
+    User->>Browser: Click Hide Fields
+    Browser->>Visibility: toggle_field_visibility(editor)
+    Visibility->>Config: Re-enable hiding for note type
+    Visibility->>DOM: Apply hide JS again
+    Visibility-->>Browser: Update button label

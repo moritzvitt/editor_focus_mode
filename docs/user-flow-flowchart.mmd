@@ -1,0 +1,21 @@
+flowchart TD
+    A[Anki loads add-on] --> B[__init__.py registers hooks and menu action]
+    B --> C[User opens Browser]
+    C --> D[register_browser_instance stores current browser]
+    D --> E[User selects note]
+    E --> F[editor_will_load_note reads browser and config]
+    F --> G[Hide or reset JS is prepared]
+    G --> H[apply_field_visibility runs on live editor]
+    H --> I{Hiding active for this note type?}
+    I -- Yes --> J[Hide non-allowed field containers]
+    I -- No --> K[Show all field containers]
+    J --> L[User clicks Show Fields]
+    K --> L
+    L --> M[toggle_field_visibility updates config]
+    M --> N[Note type added to field_visibility_disabled]
+    N --> O[Reset visibility and show all fields]
+    O --> P[User clicks Hide Fields]
+    P --> Q[toggle_field_visibility updates config again]
+    Q --> R[Note type removed from field_visibility_disabled]
+    R --> S[Hide JS is applied again]
+    S --> T[Configured fields remain visible]

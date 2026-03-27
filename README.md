@@ -133,6 +133,10 @@ editor_focus_mode/
 
 For a code-level walkthrough of the runtime flow, hook registration, toggle behavior, and module responsibilities, see [`docs/architecture.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/architecture.md).
 
+For a concise DOM selector reference, see [`docs/wrappers.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/wrappers.md).
+
+For a user-journey walkthrough of opening the Browser, selecting a note, and toggling visibility, see [`docs/user-flow.md`](/Users/moritzvitt/src/addons/editor_focus_mode/docs/user-flow.md).
+
 ### Contributing
 
 1. Fork the repository

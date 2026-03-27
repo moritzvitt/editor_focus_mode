@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant U as User
+    participant A as Anki
+    participant I as __init__.py
+    participant B as browser_utils.py
+    participant F as field_visibility.py
+    participant C as Config
+    participant D as Editor DOM
+
+    A->>I: Load add-on
+    I-->>A: Register hooks and menu action
+
+    U->>A: Open Browser
+    A->>B: register_browser_instance(browser)
+    B-->>A: Store current browser
+
+    U->>A: Select note
+    A->>F: editor_will_load_note(js, note, editor)
+    F->>B: current_browser()
+    F->>C: Read visibility config
+    F-->>A: Return hide/reset JS
+    A->>F: apply_field_visibility(editor)
+    F->>C: Read visibility config
+    alt Hiding is active
+        F->>D: Hide non-allowed field containers
+    else Hiding is disabled
+        F->>D: Reset all field containers
+    end
+
+    U->>A: Click Show Fields
+    A->>F: toggle_field_visibility(editor)
+    F->>C: Add note type to field_visibility_disabled
+    F->>D: Reset visibility
+    F-->>A: Update button label
+
+    U->>A: Click Hide Fields
+    A->>F: toggle_field_visibility(editor)
+    F->>C: Remove note type from field_visibility_disabled
+    F->>D: Apply hide JS again
+    F-->>A: Update button label
