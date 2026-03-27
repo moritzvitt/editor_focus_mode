@@ -4,5 +4,22 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.exclude": {
+			"**/__pycache__": true,
+			"field_visibility_debug.txt": true
+		},
+		"search.exclude": {
+			"**/__pycache__": true,
+			".venv": true,
+			"venv": true
+		},
+		"files.watcherExclude": {
+			"**/__pycache__/**": true,
+			".venv/**": true,
+			"venv/**": true
+		},
+		"files.trimTrailingWhitespace": true,
+		"files.insertFinalNewline": true
+	}
 }

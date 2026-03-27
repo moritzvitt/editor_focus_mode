@@ -45,10 +45,20 @@ Important config keys:
 
 - `field_visibility_map`
   - Maps note type name -> list of fields that should remain visible.
+- `field_visibility_layouts`
+  - Maps note type name -> list of field layouts.
+- `field_visibility_active_layouts`
+  - Stores the currently selected layout index per note type.
 - `field_visibility_disabled`
   - Stores note types for which hiding is temporarily turned off.
 
 The toggle button does not store state in the UI. It stores state in `field_visibility_disabled`.
+
+Maintenance note:
+
+- `FIELD_VISIBILITY_MAP` and `get_field_visibility_map()` still exist mainly for backward compatibility with older config data.
+- This legacy path is used for migration into the newer layout-based config structure.
+- It can likely be removed later once migration from older configs is no longer needed.
 
 ### [`browser_utils.py`](../browser_utils.py)
 

@@ -7,15 +7,6 @@ FIELD_VISIBILITY_LAYOUTS = "field_visibility_layouts"
 FIELD_VISIBILITY_ACTIVE_LAYOUTS = "field_visibility_active_layouts"
 FIELD_VISIBILITY_DISABLED = "field_visibility_disabled"
 
-DEFAULT_NOTE_TYPE = "Moritz Language Reactor"
-DEFAULT_FIELD_LAYOUTS = {
-    DEFAULT_NOTE_TYPE: [
-        ["Lemma", "Cloze", "Synonyms", "Japanese Notes"],
-        ["Cloze"],
-        ["Cloze", "Lemma"],
-    ]
-}
-
 
 ADDON_NAME = __name__.split(".")[0]
 
@@ -66,13 +57,7 @@ def get_field_visibility_layouts(config: dict[str, str]) -> dict[str, list[list[
                 layouts[str(key)] = normalized
         if layouts:
             return layouts
-    legacy_map = get_field_visibility_map(config)
-    if legacy_map:
-        return {key: [value] for key, value in legacy_map.items()}
-    return {
-        key: [list(layout) for layout in value]
-        for key, value in DEFAULT_FIELD_LAYOUTS.items()
-    }
+    return _layouts_from_legacy_map(config)
 
 
 def get_field_visibility_active_layouts(config: dict[str, str]) -> dict[str, int]:
@@ -96,19 +81,7 @@ def get_field_visibility_disabled(config: dict[str, str]) -> list[str]:
 
 
 def _initial_layouts_from_config(config: dict[str, str]) -> dict[str, list[list[str]]]:
-    legacy_map = get_field_visibility_map(config)
-    if not legacy_map:
-        return {
-            key: [list(layout) for layout in value]
-            for key, value in DEFAULT_FIELD_LAYOUTS.items()
-        }
-    layouts = {key: [value] for key, value in legacy_map.items()}
-    default_layouts = DEFAULT_FIELD_LAYOUTS.get(DEFAULT_NOTE_TYPE, [])
-    if DEFAULT_NOTE_TYPE in layouts and len(layouts[DEFAULT_NOTE_TYPE]) == 1:
-        for extra_layout in default_layouts[1:]:
-            if extra_layout not in layouts[DEFAULT_NOTE_TYPE]:
-                layouts[DEFAULT_NOTE_TYPE].append(list(extra_layout))
-    return layouts
+    return _layouts_from_legacy_map(config)
 
 
 def _first_layout_map(layouts: object) -> dict[str, list[str]]:
@@ -123,3 +96,10 @@ def _first_layout_map(layouts: object) -> dict[str, list[str]]:
             continue
         normalized[str(key)] = [str(item) for item in first]
     return normalized
+
+
+def _layouts_from_legacy_map(config: dict[str, str]) -> dict[str, list[list[str]]]:
+    legacy_map = get_field_visibility_map(config)
+    if not legacy_map:
+        return {}
+    return {key: [value] for key, value in legacy_map.items()}
