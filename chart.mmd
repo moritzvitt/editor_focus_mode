@@ -1,0 +1,39 @@
+
+flowchart TD
+    A["apply_field_visibility(editor)"] --> B{"Toggle bypass active"}
+    B -- Yes --> C["Reset visibility for all note fields"]
+    C --> Z1["Return"]
+
+    B -- No --> D["Get current browser"]
+    D --> E{"Browser exists and has editor"}
+    E -- No --> Z1
+    E -- Yes --> F{"Editor is browser editor"}
+    F -- No --> Z1
+    F -- Yes --> G["Get editor note"]
+    G --> H{"Note exists"}
+    H -- No --> Z1
+    H -- Yes --> I["Get note type name"]
+    I --> J{"Note type found"}
+    J -- No --> Z1
+    J -- Yes --> K["Load config and field map"]
+    K --> L{"Field map empty"}
+    L -- Yes --> M["Use default note type mapping"]
+    L -- No --> N["Use configured field map"]
+    M --> O{"Note type supported"}
+    N --> O
+    O -- No --> P["Update toggle button label"]
+    P --> Q["Reset visibility"]
+    Q --> Z1
+    O -- Yes --> R{"Visibility disabled for note type"}
+    R -- Yes --> S["Update toggle button label"]
+    S --> T["Reset visibility"]
+    T --> Z1
+    R -- No --> U["Get allowed fields"]
+    U --> V["Compute allowed indices and field names"]
+    V --> W["Build hide-fields JavaScript"]
+    W --> X["Run JS now and again after delays"]
+    X --> Y["Update toggle button label"]
+    Y --> Z["Write debug dump"]
+    Z --> Z1
+
+```

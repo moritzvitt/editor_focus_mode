@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 _ACTIVE_FIELD_CONTEXT: dict[str, object] | None = None
-_BATCH_LIMIT = 5
+
 
 
 def on_editor_did_focus_field(note, field_idx) -> None:
