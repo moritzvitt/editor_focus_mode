@@ -13,17 +13,34 @@ Example:
 ```json
 {
   "Basic": [
-    ["Front", "Back"],
-    ["Front"]
+    {
+      "name": "Default",
+      "visible_fields": ["Front", "Back"]
+    },
+    {
+      "name": "Minimal",
+      "visible_fields": ["Front"]
+    }
   ],
   "Cloze": [
-    ["Text", "Extra"],
-    ["Text"]
+    {
+      "name": "Reading",
+      "visible_fields": ["Text", "Extra"]
+    }
   ]
 }
 ```
 
-Each inner list is one layout. The layout button rotates through the available layouts for the current note type.
+Each layout can now have a configurable `name`. Clicking the layout button in the editor opens a dialog where you can rename layouts and choose which fields should be hidden for the active layout.
+
+Older list-only layouts are still migrated automatically by the add-on.
+
+For note types that do not yet have saved settings, the add-on creates defaults automatically from the field order, so fresh installs do not need field names configured in advance:
+
+- the regular hide-fields toggle shows only the first field
+- `Layout 1` shows the first 2 fields
+- `Layout 2` shows the first 3 fields
+- `Layout 3` shows the first 4 fields
 
 ### `field_visibility_active_layouts`
 

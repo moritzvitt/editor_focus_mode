@@ -1,23 +1,6 @@
 {
-  "field_visibility_layouts": {
-    "Moritz Language Reactor": [
-      [
-        "Lemma",
-        "Cloze",
-        "Synonyms",
-        "Japanese Notes"
-      ],
-      [
-        "Cloze"
-      ],
-      [
-        "Cloze",
-        "Lemma"
-      ]
-    ]
-  },
-  "field_visibility_active_layouts": {
-    "Moritz Language Reactor": 0
-  },
+  "field_visibility_map": {},
+  "field_visibility_layouts": {},
+  "field_visibility_active_layouts": {},
   "field_visibility_disabled": []
 }

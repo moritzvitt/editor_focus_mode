@@ -9,13 +9,21 @@ from pathlib import Path
 from .browser_utils import current_browser
 from .config import (
     FIELD_VISIBILITY_ACTIVE_LAYOUTS,
+    default_layouts_from_field_names,
+    default_toggle_visible_fields,
+    ensure_note_type_defaults,
     get_addon_config,
     get_field_visibility_active_layouts,
     get_field_visibility_disabled,
     get_field_visibility_layouts,
+    get_field_visibility_map,
+    layout_name,
+    layout_visible_fields,
     save_addon_config,
+    set_field_visibility_layouts,
     FIELD_VISIBILITY_DISABLED,
 )
+from .layout_dialog import LayoutDialog
 
 _TOGGLE_BYPASS_UNTIL = 0.0
 
@@ -37,18 +45,28 @@ def apply_field_visibility(editor) -> None:
     if not note_type_name:
         return
     config = get_addon_config()
+    all_names = _all_field_names_from_note(note)
+    if ensure_note_type_defaults(config, note_type_name, all_names):
+        save_addon_config(config)
     layout_map = get_field_visibility_layouts(config)
     if note_type_name not in layout_map:
         _update_button_labels(editor)
-        _, _, all_names = _allowed_field_indices(note, [])
         _reset_visibility(editor, all_names)
         return
     if note_type_name in get_field_visibility_disabled(config):
         _update_button_labels(editor)
-        _, _, all_names = _allowed_field_indices(note, [])
-        _reset_visibility(editor, all_names)
+        toggle_map = get_field_visibility_map(config)
+        allowed = toggle_map.get(note_type_name) or default_toggle_visible_fields(all_names)
+        allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
+        js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+        try:
+            editor.web.eval(js)
+            editor.web.eval(f"setTimeout(function(){{ {js} }}, 50);")
+            editor.web.eval(f"setTimeout(function(){{ {js} }}, 200);")
+        except Exception:
+            pass
         return
-    _, _, allowed = _current_layout_fields(note_type_name, config)
+    _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
     allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
     js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
     try:
@@ -75,11 +93,18 @@ def editor_will_load_note(js: str, note, editor) -> str:
     if not note_type_name:
         return js
     config = get_addon_config()
+    all_names = _all_field_names_from_note(note)
+    if ensure_note_type_defaults(config, note_type_name, all_names):
+        save_addon_config(config)
     layout_map = get_field_visibility_layouts(config)
-    if note_type_name in get_field_visibility_disabled(config) or note_type_name not in layout_map:
-        _, _, all_names = _allowed_field_indices(note, [])
+    if note_type_name in get_field_visibility_disabled(config):
+        toggle_map = get_field_visibility_map(config)
+        allowed = toggle_map.get(note_type_name) or default_toggle_visible_fields(all_names)
+        allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
+        return js + _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+    if note_type_name not in layout_map:
         return js + _reset_fields_js(all_names)
-    _, _, allowed = _current_layout_fields(note_type_name, config)
+    _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
     allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
     return js + _hide_fields_js(allowed_indices, field_count, all_names, allowed)
 
@@ -219,6 +244,9 @@ def toggle_field_visibility(editor) -> None:
     if not note_type_name:
         return
     config = get_addon_config()
+    all_names = _all_field_names_from_note(note)
+    if ensure_note_type_defaults(config, note_type_name, all_names):
+        save_addon_config(config)
     disabled = get_field_visibility_disabled(config)
     layout_map = get_field_visibility_layouts(config)
     if note_type_name not in layout_map:
@@ -233,8 +261,12 @@ def toggle_field_visibility(editor) -> None:
         _TOGGLE_BYPASS_UNTIL = time.time() + 0.5
     else:
         _TOGGLE_BYPASS_UNTIL = 0.0
-    _, _, allowed = _current_layout_fields(note_type_name, config)
-    allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
+    if note_type_name in disabled:
+        toggle_map = get_field_visibility_map(config)
+        allowed = toggle_map.get(note_type_name) or default_toggle_visible_fields(all_names)
+    else:
+        _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
+    allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
     if note_type_name in disabled:
         _reset_visibility(editor, all_names)
     else:
@@ -256,7 +288,7 @@ def toggle_field_visibility(editor) -> None:
     QTimer.singleShot(300, lambda: _update_button_labels(editor))
 
 
-def cycle_field_layout(editor) -> None:
+def configure_field_layout(editor) -> None:
     note = getattr(editor, "note", None)
     if note is None:
         return
@@ -266,18 +298,33 @@ def cycle_field_layout(editor) -> None:
     config = get_addon_config()
     layout_map = get_field_visibility_layouts(config)
     layouts = layout_map.get(note_type_name) or []
+    all_names = _all_field_names_from_note(note)
     if not layouts:
-        return
+        layouts = default_layouts_from_field_names(all_names)
     active_layouts = get_field_visibility_active_layouts(config)
     current_index = active_layouts.get(note_type_name, 0) % len(layouts)
-    active_layouts[note_type_name] = (current_index + 1) % len(layouts)
-    config[FIELD_VISIBILITY_ACTIVE_LAYOUTS] = active_layouts
+    parent_widget = getattr(editor, "parentWindow", None) or current_browser() or editor
+    dialog = LayoutDialog(
+        parent=parent_widget,
+        note_type_name=note_type_name,
+        field_names=all_names,
+        layouts=layouts,
+        active_index=current_index,
+    )
+    if dialog.exec() != dialog.DialogCode.Accepted:
+        return
+    updated_layouts, active_index = dialog.result_payload()
+    set_field_visibility_layouts(
+        config,
+        note_type_name,
+        updated_layouts,
+        active_index=active_index,
+    )
     save_addon_config(config)
-    _, _, all_names = _allowed_field_indices(note, [])
     if note_type_name in get_field_visibility_disabled(config):
         _reset_visibility(editor, all_names)
     else:
-        _, _, allowed = _current_layout_fields(note_type_name, config)
+        _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
         allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
         js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
         try:
@@ -305,11 +352,11 @@ def editor_init_buttons(buttons: list[str], editor) -> None:
     buttons.append(toggle_button)
     layout_button = editor.addButton(
         icon=None,
-        cmd="prompt_addon_cycle_layout",
-        func=lambda ed: cycle_field_layout(ed),
-        tip="Cycle visible field layout",
-        label="Layout 1/1",
-        id="prompt-addon-cycle-layout",
+        cmd="prompt_addon_configure_layout",
+        func=lambda ed: configure_field_layout(ed),
+        tip="Configure hidden fields for the current layout",
+        label="Layout",
+        id="prompt-addon-configure-layout",
         rightside=True,
     )
     buttons.append(layout_button)
@@ -365,15 +412,19 @@ def _update_layout_button_label(editor) -> None:
     if not note_type_name:
         return
     config = get_addon_config()
-    layouts, active_index, _ = _current_layout_fields(note_type_name, config)
+    layouts, active_index, _, active_layout = _current_layout_fields(
+        note_type_name,
+        config,
+        _all_field_names_from_note(note),
+    )
     if not layouts:
         return
-    label = f"Layout {active_index + 1}/{len(layouts)}"
+    label = layout_name(active_layout, active_index)
     js = f"""
     (function() {{
       const label = "{label}";
       const apply = () => {{
-        const btn = document.getElementById("prompt-addon-cycle-layout");
+        const btn = document.getElementById("prompt-addon-configure-layout");
         if (btn) {{
           btn.textContent = label;
           return true;
@@ -418,11 +469,18 @@ def _reset_fields_js(all_names: list[str]) -> str:
 def _current_layout_fields(
     note_type_name: str,
     config: dict[str, str],
-) -> tuple[list[list[str]], int, list[str]]:
+    all_field_names: list[str],
+) -> tuple[list[dict[str, object]], int, list[str], dict[str, object] | None]:
     layout_map = get_field_visibility_layouts(config)
     layouts = layout_map.get(note_type_name) or []
     if not layouts:
-        return [], 0, []
+        return [], 0, [], None
     active_layouts = get_field_visibility_active_layouts(config)
     active_index = active_layouts.get(note_type_name, 0) % len(layouts)
-    return layouts, active_index, layouts[active_index]
+    active_layout = layouts[active_index]
+    return (
+        layouts,
+        active_index,
+        layout_visible_fields(active_layout, all_field_names),
+        active_layout,
+    )
