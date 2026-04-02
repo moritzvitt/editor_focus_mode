@@ -53,7 +53,7 @@ class LayoutDialog(QDialog):
         self.layout_list = QListWidget()
         self.layout_name_edit = QLineEdit()
         self.active_layout_checkbox = QCheckBox("Use this as the active layout")
-        self.hidden_fields_list = QListWidget()
+        self.visible_fields_list = QListWidget()
 
         self._loading_layout = True
         self._build_ui()
@@ -68,8 +68,8 @@ class LayoutDialog(QDialog):
         layout = QVBoxLayout(self)
 
         intro = QLabel(
-            "Choose which fields should be hidden for each layout. "
-            "Unchecked fields stay visible while editing."
+            "Choose which fields should stay visible for each layout. "
+            "Checked fields stay visible while editing."
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -101,10 +101,10 @@ class LayoutDialog(QDialog):
         form.addRow("", self.active_layout_checkbox)
         right_layout.addLayout(form)
 
-        hide_help = QLabel("Checked fields are hidden in this layout.")
+        hide_help = QLabel("Checked fields are shown in this layout.")
         hide_help.setWordWrap(True)
         right_layout.addWidget(hide_help)
-        right_layout.addWidget(self.hidden_fields_list)
+        right_layout.addWidget(self.visible_fields_list)
 
         top.addWidget(left_group, stretch=2)
         top.addWidget(right_group, stretch=3)
@@ -130,16 +130,16 @@ class LayoutDialog(QDialog):
         visible_fields = set(layout_visible_fields(layout, self.field_names))
         self.layout_name_edit.setText(layout_name(layout, index))
         self.active_layout_checkbox.setChecked(index == self.active_index)
-        self.hidden_fields_list.clear()
+        self.visible_fields_list.clear()
         for field_name in self.field_names:
             item = QListWidgetItem(field_name)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
                 Qt.CheckState.Checked
-                if field_name not in visible_fields
+                if field_name in visible_fields
                 else Qt.CheckState.Unchecked
             )
-            self.hidden_fields_list.addItem(item)
+            self.visible_fields_list.addItem(item)
 
     def _store_current_layout(self) -> bool:
         if self.current_index < 0 or self.current_index >= len(self.layouts):
@@ -147,9 +147,9 @@ class LayoutDialog(QDialog):
 
         layout_name_value = self.layout_name_edit.text().strip() or default_layout_name(self.current_index)
         visible_fields: list[str] = []
-        for row in range(self.hidden_fields_list.count()):
-            item = self.hidden_fields_list.item(row)
-            if item.checkState() != Qt.CheckState.Checked:
+        for row in range(self.visible_fields_list.count()):
+            item = self.visible_fields_list.item(row)
+            if item.checkState() == Qt.CheckState.Checked:
                 visible_fields.append(item.text())
 
         if not visible_fields:

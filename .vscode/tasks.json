@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Validate addon",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "-m",
+        "py_compile",
+        "__init__.py",
+        "field_visibility.py",
+        "config.py",
+        "browser_utils.py",
+        "layout_dialog.py"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Prepare release",
+      "type": "shell",
+      "command": "./scripts/release.sh",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Package .ankiaddon",
+      "type": "shell",
+      "command": "./scripts/release.sh",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Show Anki addon symlink",
+      "type": "shell",
+      "command": "ls",
+      "args": [
+        "-ld",
+        "/Users/moritzvitt/Library/Application Support/Anki2/addons21/editor_focus_mode"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "List Codex skills",
+      "type": "shell",
+      "command": "find",
+      "args": [
+        "/Users/moritzvitt/.codex/skills",
+        "-maxdepth",
+        "2",
+        "-name",
+        "SKILL.md"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Remove debug dump",
+      "type": "shell",
+      "command": "rm",
+      "args": [
+        "-f",
+        "field_visibility_debug.txt"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

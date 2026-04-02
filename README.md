@@ -41,3 +41,10 @@ The main hard parts are:
 - Wrapper reference: [`docs/wrappers.md`](./docs/wrappers.md)
 - User flow: [`docs/user-flow.md`](./docs/user-flow.md)
 - Charts: [`docs/charts/`](./docs/charts/)
+
+
+## Release Workflow
+
+Run `./scripts/release.sh` to validate the add-on and build a clean `editor_focus_mode.ankiaddon` package for AnkiWeb upload. The script also prints the latest tag, the top changelog entry, and the remaining manual release steps.
+
+If you use VS Code, run the `Prepare release` task for the same workflow.
