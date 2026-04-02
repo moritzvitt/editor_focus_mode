@@ -15,23 +15,26 @@ Example:
   "Basic": [
     {
       "name": "Default",
-      "visible_fields": ["Front", "Back"]
+      "visible_fields": ["Front", "Back"],
+      "field_order": ["Front", "Back", "Hint"]
     },
     {
       "name": "Minimal",
-      "visible_fields": ["Front"]
+      "visible_fields": ["Front"],
+      "field_order": ["Front", "Hint", "Back"]
     }
   ],
   "Cloze": [
     {
       "name": "Reading",
-      "visible_fields": ["Text", "Extra"]
+      "visible_fields": ["Text", "Extra"],
+      "field_order": ["Text", "Extra"]
     }
   ]
 }
 ```
 
-Each layout can now have a configurable `name`. Clicking the layout button in the editor opens a dialog where you can rename layouts and choose which fields should be hidden for the active layout.
+Each layout can have a configurable `name`, `visible_fields`, and `field_order`. Clicking the layout button in the editor opens a dialog where you can rename layouts, choose which fields should be hidden for the active layout, and move fields up or down to save a custom order.
 
 Older list-only layouts are still migrated automatically by the add-on.
 

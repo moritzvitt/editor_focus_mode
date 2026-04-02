@@ -54,6 +54,7 @@ class LayoutDialog(QDialog):
         self.layout_name_edit = QLineEdit()
         self.active_layout_checkbox = QCheckBox("Use this as the active layout")
         self.visible_fields_list = QListWidget()
+        self.visible_fields_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
 
         self._loading_layout = True
         self._build_ui()
@@ -104,7 +105,19 @@ class LayoutDialog(QDialog):
         hide_help = QLabel("Checked fields are shown in this layout.")
         hide_help.setWordWrap(True)
         right_layout.addWidget(hide_help)
-        right_layout.addWidget(self.visible_fields_list)
+        fields_row = QHBoxLayout()
+        fields_row.addWidget(self.visible_fields_list, stretch=1)
+
+        order_buttons = QVBoxLayout()
+        move_up_button = QPushButton("Move Up")
+        move_down_button = QPushButton("Move Down")
+        move_up_button.clicked.connect(lambda: self._move_selected_field(-1))
+        move_down_button.clicked.connect(lambda: self._move_selected_field(1))
+        order_buttons.addWidget(move_up_button)
+        order_buttons.addWidget(move_down_button)
+        order_buttons.addStretch(1)
+        fields_row.addLayout(order_buttons)
+        right_layout.addLayout(fields_row)
 
         top.addWidget(left_group, stretch=2)
         top.addWidget(right_group, stretch=3)
@@ -128,10 +141,11 @@ class LayoutDialog(QDialog):
         self.current_index = index
         layout = self.layouts[index]
         visible_fields = set(layout_visible_fields(layout, self.field_names))
+        field_order = self._layout_field_order(layout)
         self.layout_name_edit.setText(layout_name(layout, index))
         self.active_layout_checkbox.setChecked(index == self.active_index)
         self.visible_fields_list.clear()
-        for field_name in self.field_names:
+        for field_name in field_order:
             item = QListWidgetItem(field_name)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
@@ -147,8 +161,10 @@ class LayoutDialog(QDialog):
 
         layout_name_value = self.layout_name_edit.text().strip() or default_layout_name(self.current_index)
         visible_fields: list[str] = []
+        field_order: list[str] = []
         for row in range(self.visible_fields_list.count()):
             item = self.visible_fields_list.item(row)
+            field_order.append(item.text())
             if item.checkState() == Qt.CheckState.Checked:
                 visible_fields.append(item.text())
 
@@ -159,6 +175,7 @@ class LayoutDialog(QDialog):
         self.layouts[self.current_index] = {
             "name": layout_name_value,
             "visible_fields": visible_fields,
+            "field_order": field_order,
         }
         if self.active_layout_checkbox.isChecked():
             self.active_index = self.current_index
@@ -187,6 +204,7 @@ class LayoutDialog(QDialog):
             {
                 "name": default_layout_name(new_index),
                 "visible_fields": list(self.field_names),
+                "field_order": list(self.field_names),
             }
         )
         self._populate_layouts()
@@ -228,3 +246,32 @@ class LayoutDialog(QDialog):
         if not self._store_current_layout():
             return
         self.accept()
+
+    def _layout_field_order(self, layout: dict[str, object]) -> list[str]:
+        field_order = layout.get("field_order")
+        if isinstance(field_order, list):
+            ordered: list[str] = []
+            seen: set[str] = set()
+            for item in field_order:
+                field_name = str(item).strip()
+                if not field_name or field_name in seen:
+                    continue
+                ordered.append(field_name)
+                seen.add(field_name)
+            for field_name in self.field_names:
+                if field_name not in seen:
+                    ordered.append(field_name)
+            if ordered:
+                return ordered
+        return list(self.field_names)
+
+    def _move_selected_field(self, direction: int) -> None:
+        current_row = self.visible_fields_list.currentRow()
+        if current_row < 0:
+            return
+        new_row = current_row + direction
+        if new_row < 0 or new_row >= self.visible_fields_list.count():
+            return
+        item = self.visible_fields_list.takeItem(current_row)
+        self.visible_fields_list.insertItem(new_row, item)
+        self.visible_fields_list.setCurrentRow(new_row)

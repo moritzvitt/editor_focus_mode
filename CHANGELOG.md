@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Added per-layout field ordering, so layouts can now both hide fields and rearrange the editor field order.
+
 ## 0.2.0 - 2026-03-27
 
 ### Added

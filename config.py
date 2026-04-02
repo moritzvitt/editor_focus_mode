@@ -31,12 +31,14 @@ def default_layouts_from_field_names(field_names: list[str]) -> list[dict[str, o
             {
                 "name": default_layout_name(index),
                 "visible_fields": visible_fields,
+                "field_order": list(field_names),
             }
         )
     return layouts or [
         {
             "name": default_layout_name(0),
             "visible_fields": list(field_names[:1]),
+            "field_order": list(field_names),
         }
     ]
 
@@ -200,16 +202,44 @@ def layout_visible_fields(layout: object, all_field_names: list[str]) -> list[st
     return []
 
 
+def layout_field_order(layout: object, all_field_names: list[str]) -> list[str]:
+    if isinstance(layout, dict):
+        field_order = layout.get("field_order")
+        if isinstance(field_order, list):
+            return _normalize_field_order(field_order, all_field_names)
+    return list(all_field_names)
+
+
 def _normalize_layout_entries(entries: list[object]) -> list[dict[str, object]]:
     normalized: list[dict[str, object]] = []
     for index, entry in enumerate(entries):
         visible_fields = layout_visible_fields(entry, [])
         if not visible_fields:
             continue
+        field_order = layout_field_order(entry, visible_fields)
+        visible_set = set(field_order)
+        visible_fields = [field for field in visible_fields if field in visible_set]
         normalized.append(
             {
                 "name": layout_name(entry, index),
                 "visible_fields": visible_fields,
+                "field_order": field_order,
             }
         )
     return normalized
+
+
+def _normalize_field_order(field_order: list[object], all_field_names: list[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for item in field_order:
+        name = str(item).strip()
+        if not name or name in seen:
+            continue
+        ordered.append(name)
+        seen.add(name)
+    for field_name in all_field_names:
+        if field_name not in seen:
+            ordered.append(field_name)
+            seen.add(field_name)
+    return ordered

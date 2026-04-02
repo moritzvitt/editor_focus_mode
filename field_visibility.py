@@ -17,6 +17,7 @@ from .config import (
     get_field_visibility_disabled,
     get_field_visibility_layouts,
     get_field_visibility_map,
+    layout_field_order,
     layout_name,
     layout_visible_fields,
     save_addon_config,
@@ -57,8 +58,10 @@ def apply_field_visibility(editor) -> None:
         _update_button_labels(editor)
         toggle_map = get_field_visibility_map(config)
         allowed = toggle_map.get(note_type_name) or default_toggle_visible_fields(all_names)
+        _, _, _, active_layout, _ = _current_layout_fields(note_type_name, config, all_names)
+        field_order = layout_field_order(active_layout, all_names) if active_layout else list(all_names)
         allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
-        js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+        js = _layout_fields_js(allowed_indices, field_count, all_names, allowed, field_order)
         try:
             editor.web.eval(js)
             editor.web.eval(f"setTimeout(function(){{ {js} }}, 50);")
@@ -66,9 +69,9 @@ def apply_field_visibility(editor) -> None:
         except Exception:
             pass
         return
-    _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
+    _, _, allowed, _, field_order = _current_layout_fields(note_type_name, config, all_names)
     allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
-    js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+    js = _layout_fields_js(allowed_indices, field_count, all_names, allowed, field_order)
     try:
         editor.web.eval(js)
         editor.web.eval(f"setTimeout(function(){{ {js} }}, 50);")
@@ -100,13 +103,16 @@ def editor_will_load_note(js: str, note, editor) -> str:
     if note_type_name in get_field_visibility_disabled(config):
         toggle_map = get_field_visibility_map(config)
         allowed = toggle_map.get(note_type_name) or default_toggle_visible_fields(all_names)
+        _, _, _, active_layout, field_order = _current_layout_fields(note_type_name, config, all_names)
         allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
-        return js + _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+        if active_layout is None:
+            field_order = list(all_names)
+        return js + _layout_fields_js(allowed_indices, field_count, all_names, allowed, field_order)
     if note_type_name not in layout_map:
         return js + _reset_fields_js(all_names)
-    _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
+    _, _, allowed, _, field_order = _current_layout_fields(note_type_name, config, all_names)
     allowed_indices, field_count, all_names = _allowed_field_indices(note, allowed)
-    return js + _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+    return js + _layout_fields_js(allowed_indices, field_count, all_names, allowed, field_order)
 
 
 def _reset_visibility(editor, all_names: list[str]) -> None:
@@ -149,18 +155,22 @@ def _debug_dump_fields(editor) -> None:
         pass
 
 
-def _hide_fields_js(
+def _layout_fields_js(
     allowed_indices: list[int],
     field_count: int,
     all_names: list[str],
     allowed_fields: list[str],
+    field_order: list[str],
 ) -> str:
     allowed = json.dumps(sorted(allowed_fields))
     allowed_idx = json.dumps(sorted(allowed_indices))
+    order = json.dumps(field_order or all_names)
     return f"""
     (function() {{
       const allowed = new Set({allowed});
       const allowedIdx = new Set({allowed_idx});
+      const fieldOrder = {order};
+      const fieldOrderRank = new Map(fieldOrder.map((name, index) => [name, index]));
       const totalFields = {int(field_count)};
       const hiddenMarker = 'data-efm-hidden';
       const rowSelector = '.field-container';
@@ -168,6 +178,23 @@ def _hide_fields_js(
       const toInt = (value) => {{
         const parsed = Number.parseInt(value ?? '', 10);
         return Number.isNaN(parsed) ? null : parsed;
+      }};
+      const fieldName = (row) => {{
+        const nameEl = row.querySelector(labelSelector);
+        return nameEl && nameEl.textContent ? nameEl.textContent.trim() : '';
+      }};
+      const reorderRows = (rows) => {{
+        if (!rows.length) return;
+        const parent = rows[0].parentElement;
+        if (!parent) return;
+        const ranked = rows
+          .map((row, index) => {{
+            const name = fieldName(row);
+            const rank = fieldOrderRank.has(name) ? fieldOrderRank.get(name) : fieldOrder.length + index;
+            return {{ row, rank }};
+          }})
+          .sort((left, right) => left.rank - right.rank);
+        ranked.forEach((entry) => parent.appendChild(entry.row));
       }};
       const setVisible = (el) => {{
         if (!el) return;
@@ -181,9 +208,9 @@ def _hide_fields_js(
       }};
       const apply = () => {{
         const rows = Array.from(document.querySelectorAll(rowSelector));
+        reorderRows(rows);
         rows.forEach((row, idx) => {{
-          const nameEl = row.querySelector(labelSelector);
-          const name = nameEl && nameEl.textContent ? nameEl.textContent.trim() : '';
+          const name = fieldName(row);
           const dataIndex = toInt(row.getAttribute('data-index'));
           const fallbackIndex = dataIndex === null ? idx : dataIndex;
           const matchesByName = Boolean(name) && allowed.has(name);
@@ -264,13 +291,18 @@ def toggle_field_visibility(editor) -> None:
     if note_type_name in disabled:
         toggle_map = get_field_visibility_map(config)
         allowed = toggle_map.get(note_type_name) or default_toggle_visible_fields(all_names)
+        _, _, _, _, field_order = _current_layout_fields(note_type_name, config, all_names)
     else:
-        _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
+        _, _, allowed, _, field_order = _current_layout_fields(note_type_name, config, all_names)
     allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
     if note_type_name in disabled:
-        _reset_visibility(editor, all_names)
+        js = _layout_fields_js(list(range(field_count)), field_count, all_names, all_names, field_order)
+        try:
+            editor.web.eval(js)
+        except Exception:
+            pass
     else:
-        js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
+        js = _layout_fields_js(allowed_indices, field_count, all_names, allowed, field_order)
         try:
             editor.web.eval(js)
         except Exception:
@@ -359,18 +391,24 @@ def select_field_layout(editor, note_type_name: str, layout_index: int) -> None:
     if note is None or note_type_name != current_note_type:
         return
 
+    _, _, allowed, _, field_order = _current_layout_fields(note_type_name, config, current_field_names)
+    allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
     if note_type_name in get_field_visibility_disabled(config):
-        _reset_visibility(editor, current_field_names)
+        js = _layout_fields_js(
+            list(range(field_count)),
+            field_count,
+            current_field_names,
+            current_field_names,
+            field_order,
+        )
     else:
-        _, _, allowed, _ = _current_layout_fields(note_type_name, config, current_field_names)
-        allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
-        js = _hide_fields_js(allowed_indices, field_count, current_field_names, allowed)
-        try:
-            editor.web.eval(js)
-        except Exception:
-            pass
-        QTimer.singleShot(150, lambda: editor.web.eval(js))
-        QTimer.singleShot(350, lambda: editor.web.eval(js))
+        js = _layout_fields_js(allowed_indices, field_count, current_field_names, allowed, field_order)
+    try:
+        editor.web.eval(js)
+    except Exception:
+        pass
+    QTimer.singleShot(150, lambda: editor.web.eval(js))
+    QTimer.singleShot(350, lambda: editor.web.eval(js))
     QTimer.singleShot(100, lambda: _update_button_labels(editor))
 
 
@@ -407,18 +445,24 @@ def configure_field_layout(editor) -> None:
         active_index=active_index,
     )
     save_addon_config(config)
+    _, _, allowed, _, field_order = _current_layout_fields(note_type_name, config, all_names)
+    allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
     if note_type_name in get_field_visibility_disabled(config):
-        _reset_visibility(editor, all_names)
+        js = _layout_fields_js(
+            list(range(field_count)),
+            field_count,
+            all_names,
+            all_names,
+            field_order,
+        )
     else:
-        _, _, allowed, _ = _current_layout_fields(note_type_name, config, all_names)
-        allowed_indices, field_count, _ = _allowed_field_indices(note, allowed)
-        js = _hide_fields_js(allowed_indices, field_count, all_names, allowed)
-        try:
-            editor.web.eval(js)
-        except Exception:
-            pass
-        QTimer.singleShot(150, lambda: editor.web.eval(js))
-        QTimer.singleShot(350, lambda: editor.web.eval(js))
+        js = _layout_fields_js(allowed_indices, field_count, all_names, allowed, field_order)
+    try:
+        editor.web.eval(js)
+    except Exception:
+        pass
+    QTimer.singleShot(150, lambda: editor.web.eval(js))
+    QTimer.singleShot(350, lambda: editor.web.eval(js))
     QTimer.singleShot(100, lambda: _update_button_labels(editor))
 
 
@@ -508,7 +552,7 @@ def _update_layout_button_label(editor) -> None:
     if not note_type_name:
         return
     config = get_addon_config()
-    layouts, active_index, _, active_layout = _current_layout_fields(
+    layouts, active_index, _, active_layout, _ = _current_layout_fields(
         note_type_name,
         config,
         _all_field_names_from_note(note),
@@ -566,11 +610,11 @@ def _current_layout_fields(
     note_type_name: str,
     config: dict[str, str],
     all_field_names: list[str],
-) -> tuple[list[dict[str, object]], int, list[str], dict[str, object] | None]:
+) -> tuple[list[dict[str, object]], int, list[str], dict[str, object] | None, list[str]]:
     layout_map = get_field_visibility_layouts(config)
     layouts = layout_map.get(note_type_name) or []
     if not layouts:
-        return [], 0, [], None
+        return [], 0, [], None, list(all_field_names)
     active_layouts = get_field_visibility_active_layouts(config)
     active_index = active_layouts.get(note_type_name, 0) % len(layouts)
     active_layout = layouts[active_index]
@@ -579,4 +623,5 @@ def _current_layout_fields(
         active_index,
         layout_visible_fields(active_layout, all_field_names),
         active_layout,
+        layout_field_order(active_layout, all_field_names),
     )

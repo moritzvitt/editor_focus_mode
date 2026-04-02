@@ -8,7 +8,7 @@ An Anki add-on for the Browser editor that hides non-relevant note fields based 
 - adds a toggle button to temporarily show all fields
 - lets the user hide non-allowed fields again on the next click
 - adds a layout button that opens a layout editor for the current note type
-- lets you rename layouts and choose which fields should be hidden per layout
+- lets you rename layouts, choose which fields should be hidden per layout, and reorder fields per layout
 - works out of the box for unconfigured note types by generating defaults from field order
 
 ## Demo
