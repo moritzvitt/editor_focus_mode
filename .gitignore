@@ -36,3 +36,4 @@ htmlcov/
 # Local debug / runtime artifacts
 field_visibility_debug.txt
 meta.json
+.DS_Store
